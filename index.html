@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resilience Decision Framework Tool</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f6;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            width: 98%; /* Adjusted for potentially tighter fit with two columns */
+            max-width: 1800px; /* Increased max-width */
+            margin: 10px auto;
+            padding: 15px;
+            background-color: #fff;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background-color: #00796b; /* Teal/Green for environment */
+            color: black;
+            padding: 15px; /* Slightly reduced padding */
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.8em; /* Slightly reduced */
+        }
+        header p {
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+        .abstract {
+            background-color: #e0f2f1;
+            border-left: 5px solid #00796b;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 0.85em;
+        }
+        .abstract strong {
+            color: #004d40;
+        }
+        nav {
+            text-align: center;
+            margin-bottom: 15px;
+            background-color: #e0f2f1;
+            padding: 8px;
+        }
+        nav button {
+            background-color: #00796b;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: background-color 0.3s ease;
+        }
+        nav button:hover {
+            background-color: #004d40;
+        }
+
+        .main-layout-container {
+            display: flex;
+            flex-grow: 1; /* Allows this container to fill remaining space */
+            min-height: 0; /* Important for flex children with % heights or vh units */
+        }
+
+        .left-pane {
+            flex: 0 0 60%; /* Takes 60% of the width */
+            padding-right: 15px;
+            overflow-y: auto; /* Scroll if content overflows */
+            max-height: calc(100vh - 200px); /* Approximate height, adjust as needed */
+        }
+
+        .right-pane {
+            flex: 0 0 40%; /* Takes 40% of the width */
+            display: flex;
+            flex-direction: column;
+            min-height: 0; /* Crucial for map sizing */
+        }
+
+        #map {
+            height: 100%; /* Map takes full height of its direct parent */
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            flex-grow: 1; /* Allows map to expand within right-pane */
+        }
+        .map-controls {
+            margin-bottom: 10px;
+            text-align: right;
+        }
+
+
+        .content-section {
+            display: none; /* Hidden by default, shown by JS */
+            padding: 15px;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .content-section:first-child {
+             margin-top: 0;
+        }
+        .content-section.active {
+            display: block;
+        }
+        h2 {
+            color: #00796b;
+            border-bottom: 2px solid #00796b;
+            padding-bottom: 5px;
+            margin-top: 0;
+        }
+        h3 {
+            color: #005a52;
+            margin-top: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px; /* Slightly reduced padding */
+            text-align: left;
+            font-size: 0.9em;
+        }
+        th {
+            background-color: #b2dfdb; /* Lighter teal */
+            color: #004d40;
+        }
+        tr:nth-child(even) {
+            background-color: #e0f2f1;
+        }
+        input[type="text"], input[type="number"], select, textarea {
+            width: calc(100% - 20px); /* Account for padding and border */
+            padding: 7px;
+            margin: 4px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 0.9em;
+        }
+        button.action-button {
+            background-color: #4CAF50; /* Green */
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        button.action-button:hover {
+            background-color: #45a049;
+        }
+        button.delete-button {
+            background-color: #f44336; /* Red */
+        }
+        button.delete-button:hover {
+            background-color: #da190b;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Adjusted minmax */
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .form-grid > div {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-weight: bold;
+            margin-bottom: 3px;
+            font-size: 0.85em;
+        }
+        .recommendation-card {
+            background-color: #e8f5e9; /* Light green */
+            border: 1px solid #a5d6a7;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .recommendation-card h3 {
+            margin-top: 0;
+            color: #2e7d32; /* Darker green */
+        }
+        #analysisLog {
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            padding: 10px;
+            max-height: 180px; /* Slightly reduced */
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.8em;
+            margin-top: 10px;
+        }
+        .coord-hint {
+            font-size: 0.8em;
+            color: #555;
+            margin-top: -4px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Resilience Decision Framework Tool</h1>
+            <p>Assessing the Feasibility and Effectiveness of Resilience Improvement Options</p>
+            <div class="abstract">
+                <p>Based on: "Assessing the Feasibility and Effectiveness of Resilience Improvement Options: A Decision-Making Framework with a Spreadsheet-Based Tool" by Seyed Rezvani, Maria João Falcão Silva, Nuno Marques de Almeida.</p>
+                <p><strong>Abstract:</strong> ...</p>
+                <p><strong>Keywords:</strong> Resilience enhancement; Decision-making framework; Feasibility; Effectiveness; Spreadsheet-based tool; reduction strategies</p>
+            </div>
+        </header>
+
+        <nav>
+            <button onclick="showSection('dataInput')">Data Input</button>
+            <!-- Removed Map View button -->
+            <button onclick="showSection('analysis')">Analysis & Recommendations</button>
+        </nav>
+
+        <div class="main-layout-container">
+            <div class="left-pane">
+                <div id="dataInput" class="content-section">
+                    <h2>Data Input</h2>
+
+                    <section id="assetsSection">
+                        <h3>Assets</h3>
+                        <form id="assetForm">
+                            <div class="form-grid">
+                                <div>
+                                    <label for="assetName">Asset Name:</label>
+                                    <input type="text" id="assetName" placeholder="e.g., City Hall">
+                                </div>
+                                <div>
+                                    <label for="assetType">Asset Type:</label>
+                                    <select id="assetType">
+                                        <option value="Building">Building</option>
+                                        <option value="Infrastructure">Infrastructure (Road, Bridge)</option>
+                                        <option value="Utility">Utility (Power, Water)</option>
+                                        <option value="Ecosystem">Ecosystem (Wetland, Forest)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="assetLat">Latitude:</label>
+                                    <input type="number" id="assetLat" placeholder="e.g., 40.7128" step="any">
+                                </div>
+                                <div>
+                                    <label for="assetLon">Longitude:</label>
+                                    <input type="number" id="assetLon" placeholder="e.g., -74.0060" step="any">
+                                </div>
+                                <div style="grid-column: span 2;"> <!-- Make this hint span across available space or below Lat/Lon fields -->
+                                     <small class="coord-hint">Click map to set Lat/Lon or enter manually.</small>
+                                </div>
+                                <div>
+                                    <label for="assetCondition">Condition (1-10, 10=Excellent):</label>
+                                    <input type="number" id="assetCondition" min="1" max="10" value="7">
+                                </div>
+                                 <div>
+                                    <label for="assetValue">Value/Importance (1-10, 10=Critical):</label>
+                                    <input type="number" id="assetValue" min="1" max="10" value="5">
+                                </div>
+                            </div>
+                            <button type="button" onclick="handleAssetFormSubmit()" id="addOrUpdateAssetBtn" class="action-button">Add Asset</button>
+                            <button type="button" onclick="clearAssetForm()" class="action-button" style="background-color: #ff9800;">Clear Form</button>
+                        </form>
+                        <table id="assetsTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Lat</th>
+                                    <th>Lon</th>
+                                    <th>Condition (1-10)</th>
+                                    <th>Value (1-10)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </section>
+
+                    <section id="hazardsSection">
+                        <h3>Hazards</h3>
+                         <div class="form-grid">
+                            <div>
+                                <label for="hazardName">Hazard Name:</label>
+                                <input type="text" id="hazardName" placeholder="e.g., Coastal Flood">
+                            </div>
+                            <div>
+                                <label for="hazardType">Hazard Type:</label>
+                                <select id="hazardType">
+                                    <option value="Flood">Flood</option>
+                                    <option value="Heatwave">Heatwave</option>
+                                    <option value="Wildfire">Wildfire</option>
+                                    <option value="Drought">Drought</option>
+                                    <option value="SeaLevelRise">Sea Level Rise</option>
+                                    <option value="Storm">Storm</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="hazardLikelihood">Likelihood (1-10, 10=Very Likely):</label>
+                                <input type="number" id="hazardLikelihood" min="1" max="10" value="5">
+                            </div>
+                            <div>
+                                <label for="hazardImpactPotential">Potential Impact Severity (1-10, 10=Catastrophic):</label>
+                                <input type="number" id="hazardImpactPotential" min="1" max="10" value="5">
+                            </div>
+                        </div>
+                        <button type="button" onclick="addHazard()" class="action-button">Add Hazard</button>
+                        <table id="hazardsTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Likelihood (1-10)</th>
+                                    <th>Impact Potential (1-10)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </section>
+
+                    <section id="strategiesSection">
+                        <h3>Resilience Improvement Strategies</h3>
+                        <div class="form-grid">
+                            <div>
+                                <label for="strategyName">Strategy Name:</label>
+                                <input type="text" id="strategyName" placeholder="e.g., Build Seawall">
+                            </div>
+                            <div>
+                                <label for="strategyApplicableHazard">Applicable Hazard Type(s):</label>
+                                <select id="strategyApplicableHazard" multiple size="3">
+                                    <option value="Flood">Flood</option>
+                                    <option value="Heatwave">Heatwave</option>
+                                    <option value="Wildfire">Wildfire</option>
+                                    <option value="Drought">Drought</option>
+                                    <option value="SeaLevelRise">Sea Level Rise</option>
+                                    <option value="Storm">Storm</option>
+                                </select>
+                                 <small>Hold Ctrl/Cmd to select multiple</small>
+                            </div>
+                            <div>
+                                <label for="strategyCost">Cost (1-10, 10=Very High):</label>
+                                <input type="number" id="strategyCost" min="1" max="10" value="5">
+                            </div>
+                            <div>
+                                <label for="strategyEffectiveness">Effectiveness (1-10, 10=Very Effective):</label>
+                                <input type="number" id="strategyEffectiveness" min="1" max="10" value="7">
+                            </div>
+                            <div>
+                                <label for="strategyFeasibility">Feasibility (1-10, 10=Very Feasible):</label>
+                                <input type="number" id="strategyFeasibility" min="1" max="10" value="7">
+                            </div>
+                        </div>
+                        <button type="button" onclick="addStrategy()" class="action-button">Add Strategy</button>
+                        <table id="strategiesTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Applicable Hazards</th>
+                                    <th>Cost (1-10)</th>
+                                    <th>Effectiveness (1-10)</th>
+                                    <th>Feasibility (1-10)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </section>
+                </div>
+
+                <!-- Removed Map View Section div -->
+
+                <div id="analysis" class="content-section">
+                    <h2>Analysis & Recommendations</h2>
+                    <button onclick="runAnalysis()" class="action-button" style="background-color: #ff9800; margin-bottom: 15px;">Run Analysis & Generate Recommendations</button>
+                    
+                    <h3>Risk Matrix (Asset vs. Hazard)</h3>
+                    <p>Calculated Risk = (Hazard Likelihood * Hazard Impact Potential * Asset Value) / Asset Condition. Higher is worse.</p>
+                    <div style="overflow-x: auto;"> <!-- For wider tables -->
+                        <table id="riskMatrixTable">
+                            <thead>
+                                <tr><th>Asset Name</th></tr> <!-- Hazard names will be added dynamically -->
+                            </thead>
+                            <tbody>
+                                <!-- Asset rows will be added dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3>Recommended Strategies</h3>
+                    <div id="recommendationsOutput">
+                        <p>Run analysis to see recommendations.</p>
+                    </div>
+                    
+                    <h3>Analysis Log</h3>
+                    <div id="analysisLog">
+                        <p>No analysis run yet.</p>
+                    </div>
+                </div>
+            </div> <!-- End of left-pane -->
+
+            <div class="right-pane">
+                <div class="map-controls">
+                    <button onclick="refreshMapMarkers()" class="action-button" style="font-size: 0.85em; padding: 6px 10px;">Refresh Map Markers</button>
+                </div>
+                <div id="map"></div>
+            </div> <!-- End of right-pane -->
+
+        </div> <!-- End of main-layout-container -->
+    </div> <!-- End of container -->
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+    <script>
+        // --- Global Data Storage ---
+        let assets = [];
+        let hazards = [];
+        let strategies = [];
+        let map;
+        let markers = [];
+        let tempMarker = null; // For click-to-add-coords feature
+        let editingAssetId = null; // To track if we are editing an asset
+
+        // --- Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            showSection('dataInput'); // Show data input by default
+            loadSampleData();
+            renderAllTables();
+            refreshMapMarkers();
+            window.addEventListener('resize', () => { if (map) map.invalidateSize(); });
+        });
+
+        function showSection(sectionId) {
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            const activeSection = document.getElementById(sectionId);
+            if (activeSection) {
+                activeSection.classList.add('active');
+            }
+            // Map is always visible, so invalidateSize call here is less critical unless left pane changes drastically
+            if (map) {
+                setTimeout(() => map.invalidateSize(), 100); // Ensure map renders correctly after layout shifts
+            }
+        }
+
+        function initMap() {
+            map = L.map('map').setView([38.7, -9.1], 6); // Default view (Portugal)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 18,
+            }).addTo(map);
+
+            // Click on map to get coordinates for new asset
+            map.on('click', function(e) {
+                if (document.getElementById('dataInput').classList.contains('active')) { // Only if data input is active
+                    document.getElementById('assetLat').value = e.latlng.lat.toFixed(5);
+                    document.getElementById('assetLon').value = e.latlng.lng.toFixed(5);
+                    
+                    if (tempMarker) {
+                        map.removeLayer(tempMarker);
+                    }
+                    tempMarker = L.marker(e.latlng, { draggable: true })
+                        .addTo(map)
+                        .bindPopup("New asset location (drag to adjust). Click map again to move.")
+                        .openPopup();
+                    
+                    tempMarker.on('dragend', function(event){
+                        var marker = event.target;
+                        var position = marker.getLatLng();
+                        marker.setLatLng(new L.LatLng(position.lat, position.lng),{draggable:'true'});
+                        map.panTo(new L.LatLng(position.lat, position.lng));
+                        document.getElementById('assetLat').value = position.lat.toFixed(5);
+                        document.getElementById('assetLon').value = position.lng.toFixed(5);
+                    });
+                }
+            });
+        }
+        
+        function logToAnalysis(message) {
+            const logDiv = document.getElementById('analysisLog');
+            const entry = document.createElement('p');
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            if (logDiv.firstChild && logDiv.firstChild.textContent === "No analysis run yet.") {
+                logDiv.innerHTML = ''; // Clear initial message
+            }
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight; // Scroll to bottom
+        }
+
+        // --- Data Management Functions ---
+        // Assets
+        function handleAssetFormSubmit() {
+            if (editingAssetId) {
+                updateAssetInList();
+            } else {
+                addAssetToList();
+            }
+        }
+
+        function addAssetToList() {
+            const name = document.getElementById('assetName').value;
+            const type = document.getElementById('assetType').value;
+            const lat = parseFloat(document.getElementById('assetLat').value);
+            const lon = parseFloat(document.getElementById('assetLon').value);
+            const condition = parseInt(document.getElementById('assetCondition').value);
+            const value = parseInt(document.getElementById('assetValue').value);
+
+            if (!name || isNaN(lat) || isNaN(lon) || isNaN(condition) || isNaN(value)) {
+                alert('Please fill all asset fields correctly.');
+                return;
+            }
+            const id = 'asset_' + Date.now();
+            const newAsset = { id, name, type, lat, lon, condition, value };
+            assets.push(newAsset);
+            renderAssetsTable();
+            addMarkerToMap(newAsset); // Add just the new marker
+            logToAnalysis(`Asset added: ${name}`);
+            clearAssetForm(); // Clears form, button text, editingAssetId, tempMarker
+        }
+
+        function updateAssetInList() {
+            const name = document.getElementById('assetName').value;
+            const type = document.getElementById('assetType').value;
+            const lat = parseFloat(document.getElementById('assetLat').value);
+            const lon = parseFloat(document.getElementById('assetLon').value);
+            const condition = parseInt(document.getElementById('assetCondition').value);
+            const value = parseInt(document.getElementById('assetValue').value);
+
+            if (!name || isNaN(lat) || isNaN(lon) || isNaN(condition) || isNaN(value)) {
+                alert('Please fill all asset fields correctly for update.');
+                return;
+            }
+
+            const assetIndex = assets.findIndex(a => a.id === editingAssetId);
+            if (assetIndex > -1) {
+                assets[assetIndex] = { id: editingAssetId, name, type, lat, lon, condition, value };
+                renderAssetsTable();
+                refreshMapMarkers(); // Re-render all markers to reflect potential changes
+                logToAnalysis(`Asset updated: ${name}`);
+            }
+            clearAssetForm();
+        }
+        
+        function clearAssetForm() {
+            document.getElementById('assetForm').reset(); // Resets form fields to default
+            document.getElementById('addOrUpdateAssetBtn').textContent = 'Add Asset';
+            editingAssetId = null;
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+                tempMarker = null;
+            }
+             // Set default values for condition and value again if reset() doesn't pick them up from HTML for some reason
+            document.getElementById('assetCondition').value = 7;
+            document.getElementById('assetValue').value = 5;
+            document.getElementById('assetType').value = "Building"; // Explicitly set default for select
+        }
+
+        function populateAssetFormForEdit(assetId) {
+            const asset = assets.find(a => a.id === assetId);
+            if (asset) {
+                document.getElementById('assetName').value = asset.name;
+                document.getElementById('assetType').value = asset.type;
+                document.getElementById('assetLat').value = asset.lat;
+                document.getElementById('assetLon').value = asset.lon;
+                document.getElementById('assetCondition').value = asset.condition;
+                document.getElementById('assetValue').value = asset.value;
+
+                document.getElementById('addOrUpdateAssetBtn').textContent = 'Update Asset';
+                editingAssetId = asset.id;
+
+                if (tempMarker) { // Remove temporary marker if one exists
+                    map.removeLayer(tempMarker);
+                    tempMarker = null;
+                }
+                
+                map.closePopup(); // Close popup after clicking edit
+                showSection('dataInput'); // Ensure data input section is visible
+                document.getElementById('assetsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                document.getElementById('assetName').focus();
+                logToAnalysis(`Editing asset: ${asset.name}`);
+            }
+        }
+
+
+        function renderAssetsTable() {
+            const tbody = document.getElementById('assetsTable').getElementsByTagName('tbody')[0];
+            tbody.innerHTML = '';
+            assets.forEach((asset) => { // Removed index as deleteAsset now takes id
+                const row = tbody.insertRow();
+                row.insertCell().textContent = asset.name;
+                row.insertCell().textContent = asset.type;
+                row.insertCell().textContent = asset.lat.toFixed(5);
+                row.insertCell().textContent = asset.lon.toFixed(5);
+                row.insertCell().textContent = asset.condition;
+                row.insertCell().textContent = asset.value;
+                const actionsCell = row.insertCell();
+                
+                const editBtn = document.createElement('button');
+                editBtn.textContent = 'Edit';
+                editBtn.className = 'action-button';
+                editBtn.style.marginRight = '5px';
+                editBtn.style.backgroundColor = '#2196F3'; // Blue for edit
+                editBtn.onclick = () => populateAssetFormForEdit(asset.id);
+                actionsCell.appendChild(editBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.className = 'action-button delete-button';
+                deleteBtn.onclick = () => deleteAsset(asset.id);
+                actionsCell.appendChild(deleteBtn);
+            });
+        }
+        
+        function deleteAsset(assetIdToDelete) {
+            const assetIndex = assets.findIndex(a => a.id === assetIdToDelete);
+            if (assetIndex > -1) {
+                const assetName = assets[assetIndex].name;
+                assets.splice(assetIndex, 1);
+                renderAssetsTable();
+                // Remove marker from map
+                const markerToRemove = markers.find(m => m.options.assetId === assetIdToDelete);
+                if (markerToRemove) map.removeLayer(markerToRemove);
+                markers = markers.filter(m => m.options.assetId !== assetIdToDelete);
+                logToAnalysis(`Asset deleted: ${assetName}`);
+                if (editingAssetId === assetIdToDelete) { // If deleting the asset being edited
+                    clearAssetForm();
+                }
+            }
+        }
+
+        // Hazards (largely unchanged, just ensure button type is button if inside a future form)
+        function addHazard() {
+            const name = document.getElementById('hazardName').value;
+            const type = document.getElementById('hazardType').value;
+            const likelihood = parseInt(document.getElementById('hazardLikelihood').value);
+            const impactPotential = parseInt(document.getElementById('hazardImpactPotential').value);
+
+            if (!name || isNaN(likelihood) || isNaN(impactPotential)) {
+                alert('Please fill all hazard fields correctly.');
+                return;
+            }
+            const id = 'hazard_' + Date.now();
+            hazards.push({ id, name, type, likelihood, impactPotential });
+            renderHazardsTable();
+            document.getElementById('hazardName').value = ''; // Simple clear
+            document.getElementById('hazardLikelihood').value = 5;
+            document.getElementById('hazardImpactPotential').value = 5;
+            logToAnalysis(`Hazard added: ${name}`);
+        }
+
+        function renderHazardsTable() {
+            const tbody = document.getElementById('hazardsTable').getElementsByTagName('tbody')[0];
+            tbody.innerHTML = '';
+            hazards.forEach((hazard, index) => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = hazard.name;
+                row.insertCell().textContent = hazard.type;
+                row.insertCell().textContent = hazard.likelihood;
+                row.insertCell().textContent = hazard.impactPotential;
+                const actionsCell = row.insertCell();
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.className = 'action-button delete-button';
+                deleteBtn.onclick = () => deleteHazard(index);
+                actionsCell.appendChild(deleteBtn);
+            });
+        }
+        function deleteHazard(index) {
+            const hazardName = hazards[index].name;
+            hazards.splice(index, 1);
+            renderHazardsTable();
+            logToAnalysis(`Hazard deleted: ${hazardName}`);
+        }
+
+        // Strategies (largely unchanged)
+        function addStrategy() {
+            const name = document.getElementById('strategyName').value;
+            const applicableHazardSelect = document.getElementById('strategyApplicableHazard');
+            const applicableHazards = Array.from(applicableHazardSelect.selectedOptions).map(opt => opt.value);
+            const cost = parseInt(document.getElementById('strategyCost').value);
+            const effectiveness = parseInt(document.getElementById('strategyEffectiveness').value);
+            const feasibility = parseInt(document.getElementById('strategyFeasibility').value);
+
+            if (!name || applicableHazards.length === 0 || isNaN(cost) || isNaN(effectiveness) || isNaN(feasibility)) {
+                alert('Please fill all strategy fields correctly and select at least one applicable hazard.');
+                return;
+            }
+            const id = 'strategy_' + Date.now();
+            strategies.push({ id, name, applicableHazards, cost, effectiveness, feasibility });
+            renderStrategiesTable();
+            document.getElementById('strategyName').value = ''; // Simple clear
+            applicableHazardSelect.selectedIndex = -1; // Clear multiple select
+            document.getElementById('strategyCost').value = 5;
+            document.getElementById('strategyEffectiveness').value = 7;
+            document.getElementById('strategyFeasibility').value = 7;
+            logToAnalysis(`Strategy added: ${name}`);
+        }
+
+        function renderStrategiesTable() {
+            const tbody = document.getElementById('strategiesTable').getElementsByTagName('tbody')[0];
+            tbody.innerHTML = '';
+            strategies.forEach((strategy, index) => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = strategy.name;
+                row.insertCell().textContent = strategy.applicableHazards.join(', ');
+                row.insertCell().textContent = strategy.cost;
+                row.insertCell().textContent = strategy.effectiveness;
+                row.insertCell().textContent = strategy.feasibility;
+                const actionsCell = row.insertCell();
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.className = 'action-button delete-button';
+                deleteBtn.onclick = () => deleteStrategy(index);
+                actionsCell.appendChild(deleteBtn);
+            });
+        }
+        function deleteStrategy(index) {
+            const strategyName = strategies[index].name;
+            strategies.splice(index, 1);
+            renderStrategiesTable();
+            logToAnalysis(`Strategy deleted: ${strategyName}`);
+        }
+        
+        function renderAllTables() {
+            renderAssetsTable();
+            renderHazardsTable();
+            renderStrategiesTable();
+        }
+
+        // --- Map Functions ---
+        function addMarkerToMap(asset) {
+            if (!map) return;
+            const popupContent = `<b>${asset.name}</b><br>Type: ${asset.type}<br>Cond: ${asset.condition}/10, Val: ${asset.value}/10
+                              <br><button class="action-button" style="padding:3px 6px; font-size:0.8em; margin-top:3px; background-color:#2196F3;" onclick="populateAssetFormForEdit('${asset.id}')">Edit Asset</button>`;
+            const marker = L.marker([asset.lat, asset.lon], { assetId: asset.id })
+                .addTo(map)
+                .bindPopup(popupContent);
+            markers.push(marker);
+        }
+
+        function refreshMapMarkers() {
+            if (!map) return;
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            assets.forEach(asset => addMarkerToMap(asset));
+            if (assets.length > 0) {
+                 map.fitBounds(L.featureGroup(markers).getBounds().pad(0.1), {maxZoom: 16});
+            } else {
+                map.setView([38.7, -9.1], 6); // Reset to default view if no assets
+            }
+            logToAnalysis('Map markers refreshed.');
+        }
+
+        // --- Analysis & Recommendation Logic (mostly unchanged) ---
+        function runAnalysis() {
+            logToAnalysis("Starting analysis...");
+            if (assets.length === 0 || hazards.length === 0) {
+                alert("Please add at least one asset and one hazard before running analysis.");
+                logToAnalysis("Analysis aborted: Insufficient data (assets or hazards).");
+                return;
+            }
+            const riskMatrix = calculateRiskMatrix();
+            renderRiskMatrixTable(riskMatrix);
+            generateRecommendations(riskMatrix);
+            logToAnalysis("Analysis complete. Recommendations generated.");
+        }
+
+        function calculateRiskMatrix() {
+            logToAnalysis("Calculating risk matrix...");
+            const matrix = [];
+            assets.forEach(asset => {
+                const assetRisks = { assetName: asset.name, assetId: asset.id, risks: {} };
+                hazards.forEach(hazard => {
+                    const riskScore = (hazard.likelihood * hazard.impactPotential * asset.value) / asset.condition;
+                    assetRisks.risks[hazard.name] = parseFloat(riskScore.toFixed(2));
+                });
+                matrix.push(assetRisks);
+            });
+            logToAnalysis("Risk matrix calculation finished.");
+            return matrix;
+        }
+        
+        function renderRiskMatrixTable(riskMatrix) {
+            const table = document.getElementById('riskMatrixTable');
+            const thead = table.getElementsByTagName('thead')[0];
+            const tbody = table.getElementsByTagName('tbody')[0];
+
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            if (hazards.length === 0 || assets.length === 0) return;
+
+            const hr = thead.insertRow();
+            const firstTh = document.createElement('th');
+            firstTh.textContent = 'Asset Name';
+            hr.appendChild(firstTh);
+            hazards.forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h.name;
+                hr.appendChild(th);
+            });
+
+            riskMatrix.forEach(assetRisk => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = assetRisk.assetName;
+                hazards.forEach(h => {
+                    row.insertCell().textContent = assetRisk.risks[h.name] !== undefined ? assetRisk.risks[h.name] : 'N/A';
+                });
+            });
+             logToAnalysis("Risk matrix table rendered.");
+        }
+
+        function generateRecommendations(riskMatrix) {
+            logToAnalysis("Generating recommendations...");
+            const recommendationsOutput = document.getElementById('recommendationsOutput');
+            recommendationsOutput.innerHTML = ''; 
+
+            if (strategies.length === 0) {
+                recommendationsOutput.innerHTML = '<p>No strategies defined. Add strategies to get recommendations.</p>';
+                logToAnalysis("No strategies available to recommend.");
+                return;
+            }
+
+            const allRiskScores = [];
+            riskMatrix.forEach(ar => Object.values(ar.risks).forEach(score => allRiskScores.push(score)));
+            allRiskScores.sort((a, b) => b - a);
+            
+            const riskThreshold = allRiskScores.length > 0 ? Math.max(50, allRiskScores[Math.floor(allRiskScores.length * 0.3)]) : 50;
+            logToAnalysis(`Risk threshold for recommendations set at: ${riskThreshold.toFixed(2)}`);
+
+            let recommendationsCount = 0;
+
+            riskMatrix.forEach(assetRiskEntry => {
+                const asset = assets.find(a => a.id === assetRiskEntry.assetId);
+                Object.entries(assetRiskEntry.risks).forEach(([hazardName, riskScore]) => {
+                    if (riskScore >= riskThreshold) {
+                        const hazard = hazards.find(h => h.name === hazardName);
+                        if (!asset || !hazard) return;
+
+                        logToAnalysis(`High risk identified: Asset '${asset.name}' for Hazard '${hazard.name}' (Risk: ${riskScore}). Evaluating strategies...`);
+
+                        const suitableStrategies = strategies.filter(s => 
+                            s.applicableHazards.includes(hazard.type)
+                        ).map(s => ({
+                            ...s,
+                            priorityScore: (s.effectiveness * 1.5) + s.feasibility - (s.cost * 0.8) 
+                        })).sort((a, b) => b.priorityScore - a.priorityScore);
+
+                        if (suitableStrategies.length > 0) {
+                            recommendationsCount++;
+                            const card = document.createElement('div');
+                            card.className = 'recommendation-card';
+                            
+                            let cardHTML = `<h3>Recommendation for ${asset.name} (Hazard: ${hazard.name}, Risk: ${riskScore.toFixed(1)})</h3>`;
+                            cardHTML += `<p>Consider the following strategies, prioritized by effectiveness, feasibility, and cost:</p><ul>`;
+                            
+                            suitableStrategies.slice(0, 3).forEach(strat => {
+                                cardHTML += `<li><strong>${strat.name}</strong> (Priority Score: ${strat.priorityScore.toFixed(1)})
+                                             <br><small>Effectiveness: ${strat.effectiveness}, Feasibility: ${strat.feasibility}, Cost: ${strat.cost}</small></li>`;
+                            });
+                            cardHTML += `</ul>`;
+                            card.innerHTML = cardHTML;
+                            recommendationsOutput.appendChild(card);
+                        } else {
+                           logToAnalysis(`No suitable strategies found for Asset '${asset.name}' against Hazard '${hazard.name}' (Type: ${hazard.type}).`);
+                        }
+                    }
+                });
+            });
+
+            if (recommendationsCount === 0) {
+                recommendationsOutput.innerHTML = '<p>No high-risk situations identified above the threshold, or no suitable strategies found for identified risks.</p>';
+                logToAnalysis("No high-risk situations met criteria or no suitable strategies found.");
+            }
+        }
+
+        // --- Sample Data Loader ---
+        function loadSampleData() {
+            // Sample data for Portugal - assets, hazards, strategies
+            // (Same as your provided sample data)
+            assets = [
+                { id: 'asset_pt_1', name: 'Hospital de Santa Maria (Lisboa)', type: 'Building', lat: 38.7515, lon: -9.1580, condition: 7, value: 9 },
+                { id: 'asset_pt_2', name: 'Ponte 25 de Abril (Lisboa)', type: 'Infrastructure', lat: 38.6898, lon: -9.1775, condition: 6, value: 10 },
+                { id: 'asset_pt_3', name: 'Aeroporto de Lisboa (Humberto Delgado)', type: 'Infrastructure', lat: 38.7756, lon: -9.1354, condition: 8, value: 9 },
+                { id: 'asset_pt_20', name: 'Baixa Pombalina (Lisboa Downtown)', type: 'Building', lat: 38.7100, lon: -9.1380, condition: 6, value: 9 }, 
+                { id: 'asset_pt_15', name: 'Complexo Industrial Autoeuropa (Palmela)', type: 'Building', lat: 38.5900, lon: -8.9400, condition: 8, value: 7 },
+                { id: 'asset_pt_4', name: 'Estação de Tratamento de Água de Lever (Porto)', type: 'Utility', lat: 41.0660, lon: -8.4873, condition: 7, value: 10 },
+                { id: 'asset_pt_5', name: 'Sé Catedral do Porto', type: 'Building', lat: 41.1426, lon: -8.6108, condition: 8, value: 7 },
+                { id: 'asset_pt_21', name: 'Ponte Dom Luís I (Porto)', type: 'Infrastructure', lat: 41.1400, lon: -8.6090, condition: 7, value: 8},
+                { id: 'asset_pt_6', name: 'Ria Formosa Natural Park (Algarve)', type: 'Ecosystem', lat: 37.0200, lon: -7.8500, condition: 7, value: 8 },
+                { id: 'asset_pt_16', name: 'Hotelaria da Praia da Rocha (Portimão)', type: 'Building', lat: 37.1175, lon: -8.5370, condition: 6, value: 7 },
+                { id: 'asset_pt_22', name: 'Aeroporto de Faro', type: 'Infrastructure', lat: 37.0144, lon: -7.9659, condition: 7, value: 8},
+                { id: 'asset_pt_7', name: 'Barragem do Alqueva (Alentejo)', type: 'Infrastructure', lat: 38.2000, lon: -7.4900, condition: 9, value: 9 },
+                { id: 'asset_pt_14', name: 'Centro Histórico de Évora (UNESCO)', type: 'Building', lat: 38.5714, lon: -7.9074, condition: 7, value: 8 },
+                { id: 'asset_pt_19', name: 'Montado de Sobro (Alentejo)', type: 'Ecosystem', lat: 38.5000, lon: -8.0000, condition: 5, value: 7 }, 
+                { id: 'asset_pt_8', name: 'Vinhas do Alto Douro Vinhateiro (UNESCO)', type: 'Ecosystem', lat: 41.1000, lon: -7.7000, condition: 6, value: 7 },
+                { id: 'asset_pt_10', name: 'Parque Nacional da Peneda-Gerês', type: 'Ecosystem', lat: 41.8000, lon: -8.1500, condition: 5, value: 7 },
+                { id: 'asset_pt_12', name: 'Universidade de Coimbra (UNESCO)', type: 'Building', lat: 40.2075, lon: -8.4210, condition: 8, value: 8 },
+                { id: 'asset_pt_17', name: 'Data Center (Covilhã)', type: 'Utility', lat: 40.2833, lon: -7.5036, condition: 9, value: 9 },
+                { id: 'asset_pt_18', name: 'Rede Elétrica de Alta Tensão (Serra da Estrela)', type: 'Utility', lat: 40.3200, lon: -7.6100, condition: 5, value: 8 },
+                { id: 'asset_pt_9', name: 'Porto de Sines (Terminal XXI)', type: 'Infrastructure', lat: 37.9500, lon: -8.8600, condition: 7, value: 9 },
+                { id: 'asset_pt_11', name: 'Central Termoelétrica de Sines (EDP)', type: 'Utility', lat: 37.9300, lon: -8.8000, condition: 6, value: 8 },
+                { id: 'asset_pt_13', name: 'Linha Ferroviária do Norte (Troço Principal)', type: 'Infrastructure', lat: 39.7500, lon: -8.8000, condition: 6, value: 9 }, 
+                { id: 'asset_pt_23', name: 'Rede de Autoestradas (A1 Lisboa-Porto)', type: 'Infrastructure', lat: 39.5000, lon: -8.7500, condition: 7, value: 9},
+                { id: 'asset_pt_24', name: 'Floresta de Eucalipto (Produção Celulose)', type: 'Ecosystem', lat: 40.0000, lon: -8.5000, condition: 4, value: 6}, 
+                { id: 'asset_pt_25', name: 'Escola Básica (Zona Rural Interior)', type: 'Building', lat: 39.8000, lon: -7.5000, condition: 5, value: 6}
+            ];
+
+            hazards = [
+                { id: 'hazard_pt_1', name: 'Inundações Costeiras (Lisboa/Cascais)', type: 'Flood', likelihood: 7, impactPotential: 8 },
+                { id: 'hazard_pt_2', name: 'Ondas de Calor Severas (Interior/Sul)', type: 'Heatwave', likelihood: 9, impactPotential: 7 },
+                { id: 'hazard_pt_3', name: 'Incêndios Florestais Extremos (Centro/Norte)', type: 'Wildfire', likelihood: 8, impactPotential: 9 },
+                { id: 'hazard_pt_4', name: 'Seca Prolongada (Alentejo/Algarve)', type: 'Drought', likelihood: 8, impactPotential: 8 },
+                { id: 'hazard_pt_5', name: 'Subida do Nível do Mar (Costa Portugal)', type: 'SeaLevelRise', likelihood: 6, impactPotential: 7 },
+                { id: 'hazard_pt_6', name: 'Cheias Fluviais (Rio Tejo/Douro/Mondego)', type: 'Flood', likelihood: 6, impactPotential: 7 },
+                { id: 'hazard_pt_7', name: 'Tempestades Intensas (Atlântico/Serras)', type: 'Storm', likelihood: 5, impactPotential: 6 },
+                { id: 'hazard_pt_8', name: 'Galernas (Costa Oeste)', type: 'Storm', likelihood: 4, impactPotential: 7 }
+            ];
+
+            strategies = [
+                { id: 'strategy_pt_1', name: 'Construção/Reforço de Diques Marítimos e Fluviais', applicableHazards: ['Flood', 'SeaLevelRise'], cost: 8, effectiveness: 9, feasibility: 6 },
+                { id: 'strategy_pt_2', name: 'Elevação de Infraestruturas Críticas em Zonas de Risco', applicableHazards: ['Flood'], cost: 7, effectiveness: 8, feasibility: 7 },
+                { id: 'strategy_pt_3', name: 'Implementação de Soluções Baseadas na Natureza (Telhados Verdes, Bacias de Retenção)', applicableHazards: ['Heatwave', 'Flood'], cost: 5, effectiveness: 7, feasibility: 8 },
+                { id: 'strategy_pt_4', name: 'Gestão Integrada de Fogos Rurais (Prevenção, Supressão)', applicableHazards: ['Wildfire'], cost: 6, effectiveness: 8, feasibility: 7 },
+                { id: 'strategy_pt_5', name: 'Modernização de Sistemas AVAC e Isolamento Térmico de Edifícios', applicableHazards: ['Heatwave'], cost: 6, effectiveness: 7, feasibility: 8 },
+                { id: 'strategy_pt_6', name: 'Promoção de Culturas Resistentes à Seca e Uso Eficiente da Água na Agricultura', applicableHazards: ['Drought'], cost: 4, effectiveness: 7, feasibility: 9 },
+                { id: 'strategy_pt_7', name: 'Restauração e Proteção de Ecossistemas Costeiros (Dunas, Sapais)', applicableHazards: ['Flood', 'SeaLevelRise', 'Storm'], cost: 5, effectiveness: 8, feasibility: 7 },
+                { id: 'strategy_pt_8', name: 'Desenvolvimento e Melhoria de Sistemas de Alerta Precoce', applicableHazards: ['Flood', 'Heatwave', 'Wildfire', 'Storm', 'Drought'], cost: 3, effectiveness: 6, feasibility: 9 },
+                { id: 'strategy_pt_9', name: 'Reforço Estrutural de Edifícios e Infraestruturas Chave', applicableHazards: ['Storm', 'Flood', 'SeaLevelRise'], cost: 8, effectiveness: 7, feasibility: 5 },
+                { id: 'strategy_pt_10', name: 'Diversificação de Fontes de Abastecimento de Água e Reutilização', applicableHazards: ['Drought'], cost: 7, effectiveness: 8, feasibility: 6 },
+                { id: 'strategy_pt_11', name: 'Ordenamento do Território Sensível ao Risco Climático', applicableHazards: ['Flood', 'Wildfire', 'SeaLevelRise', 'Drought'], cost: 4, effectiveness: 9, feasibility: 4 },
+                { id: 'strategy_pt_12', name: 'Criação de Refúgios Climáticos Urbanos e Rurais', applicableHazards: ['Heatwave'], cost: 5, effectiveness: 6, feasibility: 7 },
+                { id: 'strategy_pt_13', name: 'Manutenção e Limpeza de Linhas de Água', applicableHazards: ['Flood'], cost: 4, effectiveness: 7, feasibility: 8}
+            ];
+            logToAnalysis("Sample data for Portugal loaded (25 assets, 8 hazards, 13 strategies).");
+        }
+
+    </script>
+</body>
+</html>
